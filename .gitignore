@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Xcode build output
+build/
+DerivedData/
+
+# Xcode per-user state
+*.xcuserstate
+xcuserdata/
+*.xcscmblueprint
+*.xccheckout
+
+# Swift Package Manager
+.swiftpm/
+.build/
+
+# Xcode 27 agent and intelligence state
+*.xcodesamplecode.plist
+
+# Claude Code local settings
+.claude/settings.local.json
+CLAUDE.local.md
