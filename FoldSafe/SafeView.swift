@@ -94,11 +94,13 @@ struct SafeView<Interior: View>: View {
 
             VaultInterior(side: side) { interior }
 
+            // The door swings past square, like a real vault door, so it hangs
+            // beside the opening instead of covering what is inside.
             VaultDoor(side: side, turn: hingeAngle * 2 + (handleTurned ? 90 : 0))
-                .rotation3DEffect(.degrees(doorOpen ? -78 : 0),
+                .rotation3DEffect(.degrees(doorOpen ? -110 : 0),
                                   axis: (x: 0, y: 1, z: 0),
                                   anchor: .leading,
-                                  perspective: 0.45)
+                                  perspective: 0.4)
         }
     }
 
