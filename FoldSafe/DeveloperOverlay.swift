@@ -2,6 +2,10 @@ import SwiftUI
 
 /// Hidden developer mode: the live numbers, which input is driving the game, and
 /// a simulated hinge for testing without hardware. Players never see it.
+///
+/// Simulated input only exists while this panel is open (closing it switches back
+/// to the real hinge), so the SIMULATED INPUT banner here is always on screen
+/// whenever simulated data is driving the game.
 struct DeveloperOverlay: View {
     var hinge: HingeInput
     var game: GameModel
@@ -11,14 +15,17 @@ struct DeveloperOverlay: View {
     var close: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 8) {
             header
+            if isSimulated {
+                SimulatedBanner()
+            }
             readouts
             Divider().overlay(Color.white.opacity(0.2))
             simulator
         }
-        .padding(18)
-        .frame(width: 340)
+        .padding(14)
+        .frame(width: 320)
         .background(Color.black.opacity(0.88), in: .rect(cornerRadius: 22))
         .overlay(RoundedRectangle(cornerRadius: 22).strokeBorder(Color.white.opacity(0.14)))
         .foregroundStyle(.white)
@@ -40,7 +47,7 @@ struct DeveloperOverlay: View {
     }
 
     private var readouts: some View {
-        Grid(alignment: .leading, horizontalSpacing: 16, verticalSpacing: 7) {
+        Grid(alignment: .leading, horizontalSpacing: 14, verticalSpacing: 4) {
             GridRow {
                 Label(text: "INPUT SOURCE")
                 Text(isSimulated ? "SIMULATED" : "REAL HINGE")
@@ -59,11 +66,11 @@ struct DeveloperOverlay: View {
                                         GameConfig.holdDuration))
             row("FOLD", fold.map { "x \(Int($0.minX))–\(Int($0.maxX)), y \(Int($0.minY))–\(Int($0.maxY))" } ?? "none")
         }
-        .font(.system(size: 13, weight: .medium, design: .monospaced))
+        .font(.system(size: 12, weight: .medium, design: .monospaced))
     }
 
     private var simulator: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 SectionTitle(text: "SIMULATE HINGE")
                 Spacer()
@@ -79,7 +86,7 @@ struct DeveloperOverlay: View {
                 Text("USE REAL HINGE")
                     .font(.system(size: 14, weight: .bold).width(.expanded))
                     .frame(maxWidth: .infinity)
-                    .frame(height: 40)
+                    .frame(height: 34)
             }
             .buttonStyle(.borderedProminent)
             .tint(Palette.unlocked)
@@ -114,15 +121,15 @@ struct DeveloperOverlay: View {
 }
 
 /// Shown whenever simulated input is driving the game.
-struct SimulatedBadge: View {
+private struct SimulatedBanner: View {
     var body: some View {
         Text("SIMULATED INPUT")
-            .font(.system(size: 13, weight: .heavy).width(.expanded))
+            .font(.system(size: 15, weight: .heavy).width(.expanded))
             .tracking(1.5)
             .foregroundStyle(.black)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(Palette.near, in: Capsule())
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(Palette.near, in: .rect(cornerRadius: 12))
     }
 }
 

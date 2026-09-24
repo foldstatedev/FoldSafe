@@ -9,7 +9,9 @@ import os
 struct GameScreen: View {
     @State private var game = GameModel()
     @State private var hinge = HingeInput()
-    @State private var showsDeveloperMode = false
+    @State private var sounds = SoundEffects()
+    /// Off by default. Launching with `-FoldSafeDeveloperMode YES` opens it, for testing.
+    @State private var showsDeveloperMode = UserDefaults.standard.bool(forKey: "FoldSafeDeveloperMode")
 
     private let log = Logger(subsystem: "dev.foldstate.FoldSafe", category: "game")
 
@@ -20,10 +22,12 @@ struct GameScreen: View {
                 ZStack {
                     layout(size: proxy.size, fold: fold, now: timeline.date)
                     if showsDeveloperMode {
+                        // Top left sits over the safe on every layout, so the
+                        // message and its buttons stay usable.
                         DeveloperOverlay(hinge: hinge, game: game, fold: fold, now: timeline.date,
                                          close: toggleDeveloperMode)
                             .padding(16)
-                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                     }
                 }
             }
@@ -32,20 +36,30 @@ struct GameScreen: View {
             }
         }
         .background(Backdrop())
-        .overlay(alignment: .topTrailing) {
-            if hinge.source == .simulated {
-                SimulatedBadge().padding(16)
-            }
-        }
         .overlay(alignment: .topLeading) {
             developerModeCorner
         }
         .hingeUpdates(into: hinge)
-        .onChange(of: hinge.angle) { _, angle in
+        .onChange(of: hinge.angle) { oldAngle, angle in
             game.update(angle: angle, at: .now)
+            clickDial(from: oldAngle, to: angle)
+        }
+        .onChange(of: game.proximity(to: hinge.angle) == .inside) { _, isInside in
+            if isInside { sounds.chime() }
+        }
+        .onChange(of: game.holdStartedAt) { oldStart, start in
+            holdChanged(from: oldStart, to: start)
         }
         .onChange(of: game.phase) { _, phase in
             logPhase(phase)
+            switch phase {
+            case .unlocked: sounds.unlock(isFinale: false)
+            case .complete: sounds.unlock(isFinale: true)
+            case .intro, .playing: break
+            }
+        }
+        .task {
+            await sounds.start()
         }
         .task(id: game.holdStartedAt) {
             await finishHold()
@@ -170,7 +184,7 @@ struct GameScreen: View {
                 Subline(text: Copy.successMessages[index], compact: compact)
             case .complete:
                 Subline(text: "No joystick.\nNo slider.\nJust the hinge.", compact: compact)
-                HStack(spacing: 12) {
+                VStack(spacing: 12) {
                     Button("PLAY AGAIN") { game.playAgain(angle: hinge.angle) }
                         .buttonStyle(PillButtonStyle(isProminent: true))
                     Button("NEW TARGETS", action: newTargets)
@@ -217,9 +231,39 @@ struct GameScreen: View {
         game.advance(angle: hinge.angle)
     }
 
+    /// One click each time the dial turns a mark. The dial turns twice as far as
+    /// the hinge and has 60 marks, so that is one click per 3° of hinge.
+    private func clickDial(from oldAngle: Double?, to angle: Double?) {
+        guard let oldAngle, let angle, Int(oldAngle / 3) != Int(angle / 3) else { return }
+        let closeness: Double
+        switch game.proximity(to: angle) {
+        case .inside: closeness = 1
+        case .noSignal: closeness = 0.25
+        case .far, .closer, .almost: closeness = game.closeness(to: angle)
+        }
+        sounds.click(closeness: closeness)
+    }
+
+    private func holdChanged(from oldStart: Date?, to start: Date?) {
+        let angle = hinge.angle.map { String(format: "%.1f°", $0) } ?? "no angle"
+        if start != nil {
+            sounds.startHold()
+            log.notice("Hold started at \(angle, privacy: .public) from \(sourceName, privacy: .public)")
+        } else if case .playing = game.phase, let oldStart {
+            // Left the target before the second was up.
+            sounds.stopHold()
+            let held = String(format: "%.2f s", Date.now.timeIntervalSince(oldStart))
+            log.notice("Hold cancelled at \(angle, privacy: .public) after \(held, privacy: .public)")
+        }
+    }
+
+    private var sourceName: String {
+        hinge.source == .real ? "REAL HINGE" : "SIMULATED"
+    }
+
     private func logPhase(_ phase: Phase) {
         let angle = hinge.angle.map { String(format: "%.1f°", $0) } ?? "no angle"
-        let source = hinge.source == .real ? "REAL HINGE" : "SIMULATED"
+        let source = sourceName
         switch phase {
         case .intro:
             break
@@ -341,8 +385,11 @@ private struct PillButtonStyle: ButtonStyle {
         configuration.label
             .font(.system(size: 16, weight: .bold).width(.expanded))
             .tracking(1.5)
+            .lineLimit(1)
+            .fixedSize()
             .foregroundStyle(isProminent ? Color.black : Color.white)
             .padding(.horizontal, 28)
+            .frame(minWidth: 230)
             .frame(height: 54)
             .background(Capsule().fill(isProminent ? Color.white : Color.white.opacity(0.14)))
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
