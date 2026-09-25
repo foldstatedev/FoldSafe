@@ -1,18 +1,27 @@
 # BUILD_NOTES — FoldSafe
 
-What was built, what was actually proven, and what still needs a physical
-iPhone Duo. Everything below was measured on 24 and 25 September 2026. Nothing
-here is inferred from code alone.
+What was built, what was proven, and what still needs a physical iPhone Duo.
+Everything below was measured on 24 and 25 September 2026 with Xcode 27.1 beta in
+the iPhone Duo simulator. Nothing here is inferred from code alone, and nothing
+here was run on a physical iPhone Duo.
+
+Two terms are used throughout:
+
+- **Hinge input**, logged by the app as `REAL HINGE`: hinge updates delivered by
+  Apple's public `onHingeChange` API. In the simulator they come from DeviceHub,
+  which simulates the hinge. No physical hardware was involved.
+- **Simulated input**, logged as `SIMULATED`: FoldSafe's own developer-mode
+  slider, which bypasses the hinge API entirely.
 
 ## At a glance
 
 | Question | Answer |
 | --- | --- |
-| Is there a public hinge API? | Yes, new in the iOS 27.1 SDK. It is not in iOS 27.0. |
-| Is the hinge angle continuous? | Yes. 0° closed to 180° flat, in steps as small as 0.3°. |
-| Can the simulator drive it? | Yes, but the public controls only reach three positions. |
-| Is the game driven by the real hinge? | Yes. All three levels were unlocked with real hinge input. |
-| Tested on a physical device? | **No.** iPhone Duo is not available until 23 October 2026. |
+| Is there a public hinge API? | Yes, `onHingeChange`, new in the iOS 27.1 SDK. It is not in iOS 27.0. |
+| Is the hinge angle continuous? | Yes. 0° closed to 180° flat, in steps as small as 0.3° in the simulator. |
+| Can the simulator drive it? | Yes. DeviceHub's normal controls reach only three positions; an internal, unsupported DeviceHub control reaches the rest. |
+| Does the game respond to the hinge API? | Yes, in the simulator. All three levels were unlocked by hinge updates from `onHingeChange`. |
+| Tested on a physical iPhone Duo? | **No.** The hardware is not available until 23 October 2026. |
 
 ## Toolchain
 
@@ -89,18 +98,29 @@ Other public frameworks: AVFAudio for the sounds (`AVAudioEngine`,
 `playAudio()` and asynchronous `activate(options:)`), and `os.Logger`.
 
 **No private API.** No private frameworks, no IOKit hinge SPI, nothing from
-DeviceKit, and the app never talks to DeviceHub. The internal DeviceHub slider
-below is simulator tooling only.
+DeviceKit, and the app never talks to DeviceHub.
 
-## Is the hinge input real, simulated, or both?
+## Public app API vs simulator tooling
 
-Both, and they never mix silently.
+| | What it is | Used by |
+| --- | --- | --- |
+| `onHingeChange` | Apple's public SwiftUI hinge API | FoldSafe, for every hinge update it receives |
+| DeviceHub posture buttons | DeviceHub's normal simulator controls | Development, to move the simulated hinge |
+| Continuous DeviceHub control | Internal, unsupported simulator tooling | Development only, to reach angles between the posture buttons |
 
-- **Real:** `onHingeChange` delivers a continuous angle. This drives normal play.
-- **Simulated:** the developer-mode slider. It is always labelled SIMULATED
-  INPUT, and closing developer mode switches back to the real hinge.
+Neither DeviceHub control is part of the app. Whichever one moves the simulated
+hinge, FoldSafe only ever sees the result through `onHingeChange`.
 
-## DeviceHub public controls
+## Hinge input and simulated input
+
+Both exist, and they never mix silently.
+
+- **Hinge input:** `onHingeChange` delivers a continuous angle. This drives
+  normal play.
+- **Simulated input:** the developer-mode slider. It is always labelled
+  SIMULATED INPUT, and closing developer mode switches back to hinge input.
+
+## DeviceHub posture buttons
 
 DeviceHub's normal action bar has three posture buttons:
 
@@ -112,47 +132,49 @@ DeviceHub's normal action bar has three posture buttons:
 
 Switching between them sweeps the angle through the in-between values in under
 a second (closed → partially open took 0.2–0.7 s across runs), so apps see a
-real stream of angles. None of these controls can hold any other angle.
+stream of angles. None of these controls can hold any other angle.
 
-## Internal DeviceHub test (external tooling, not part of the app)
+## Continuous hinge testing
 
-| | |
-| --- | --- |
-| Preference | `com.apple.dt.coredevicepop.useInternalV68ActionBar` |
-| Owner | DeviceHub, domain `com.apple.dt.Devices`. The DeviceKit plugin that reads it (`CoreDevicePopDeviceKitExtension`) loads inside DeviceHub, and `defaults` resolves the domain to DeviceHub's container. |
-| Original state | **Not set** (the key did not exist). Recorded before any change, with a full export of the domain as a backup. |
-| Enable | `defaults write com.apple.dt.Devices com.apple.dt.coredevicepop.useInternalV68ActionBar -bool YES`, then quit (⌘Q) and reopen DeviceHub |
-| **Restore** | `defaults delete com.apple.dt.Devices com.apple.dt.coredevicepop.useInternalV68ActionBar`, then quit (⌘Q) and reopen DeviceHub |
-| Did it appear? | Yes. The three posture buttons were replaced by a continuous hinge slider, a tabletop control and a poses menu. |
-| Arbitrary angles held? | Yes. It held steady at, for example, 25.5°, 46.3° and 115.1°. |
-| Usable range | 0° to 180° |
-| Stability | No crashes. DeviceHub ignores a quit signal (SIGTERM), so each change needed a manual ⌘Q and relaunch. Quitting DeviceHub also ends any log stream running inside the simulator. |
-| Current state | **Restored** to the original "not set" at 11:37 and confirmed by reading it back. |
+DeviceHub's normal controls expose only a few fixed postures. During
+development, an internal and unsupported DeviceHub control was used to test
+arbitrary hinge angles in the simulator. That control is not part of Apple's
+public app API and may change or disappear in future Xcode or DeviceHub
+versions.
 
-Nothing in the app depends on this setting.
+FoldSafe itself does not depend on that internal control. The app receives
+hinge information through Apple's public `onHingeChange` API.
+
+What was observed with it:
+
+- It replaced the three posture buttons with a continuous hinge control.
+- It held arbitrary angles steady, for example 25.5°, 46.3° and 115.1°, across
+  the full 0°–180° range.
+- Switching between DeviceHub's normal and internal controls needed a DeviceHub
+  restart. There were no crashes.
 
 ## Level verification
 
-| Level | Target | Verified with | Result |
-| --- | --- | --- | --- |
-| 1 | 128° ± 15° | **REAL** hinge: DeviceHub's public "partially open" button | Unlocked at 127.8° |
-| 1 | 128° ± 15° | **REAL** hinge: internal DeviceHub slider | Unlocked at 116.5° |
-| 2 | 110° ± 7° | **REAL** hinge: internal DeviceHub slider | Unlocked at 115.6° |
-| 3 | 82° ± 3° | **REAL** hinge: internal DeviceHub slider | Unlocked at 79.4°, and again at 80.7° |
+| Level | Target | Input | Simulated hinge moved with | Result |
+| --- | --- | --- | --- | --- |
+| 1 | 128° ± 15° | Hinge input | DeviceHub's public "partially open" button | Unlocked at 127.8° |
+| 1 | 128° ± 15° | Hinge input | Internal DeviceHub control | Unlocked at 116.5° |
+| 2 | 110° ± 7° | Hinge input | Internal DeviceHub control | Unlocked at 115.6° |
+| 3 | 82° ± 3° | Hinge input | Internal DeviceHub control | Unlocked at 79.4°, and again at 80.7° |
 
 The app logs every hold and unlock with its angle and input source, for example
 `Level 2 unlocked at 115.6° from REAL HINGE`.
 
-### Level 1 with Apple's supported control, end to end
+### Level 1 with DeviceHub's public control, end to end
 
-The strongest evidence that the real API controls the game. Level 1 was
+The strongest evidence that the hinge API controls the game. Level 1 was
 waiting with the hinge closed. One click on DeviceHub's public "partially open"
 button, then nothing else was touched:
 
 ```
-11:37:45.087  Level 1 started                          real hinge closed 0.0°
+11:37:45.087  Level 1 started                          hinge closed at 0.0°
 11:42:30.574  SpringBoard: hinge state .closed → .partiallyOpen
-11:42:30.575  real hinge 5.0° → 108.3° → 113.4° → 124.3° → 125.6° → 127.8°
+11:42:30.575  hinge 5.0° → 108.3° → 113.4° → 124.3° → 125.6° → 127.8°
 11:42:30.706  Hold started at 113.4° from REAL HINGE   entered 113–143° mid-sweep
 11:42:31.682  Level 1 unlocked at 127.8° from REAL HINGE
 11:42:34.753  Level 2 started                           after the 3 s success pause
@@ -163,10 +185,10 @@ The chain was DeviceHub posture button → simulated hinge movement →
 safe unlocked. The hold finished on elapsed time while the hinge sat still at
 127.8°.
 
-### The simulated path, kept separate
+### Developer slider, kept separate
 
 The developer slider was also used to play all three levels, so the fallback is
-proven too. Every unlock was logged as simulated, never as real:
+proven too. Every unlock was logged as simulated, never as hinge input:
 
 | Level | Unlocked at | Logged source |
 | --- | --- | --- |
@@ -176,11 +198,12 @@ proven too. Every unlock was logged as simulated, never as real:
 
 ### Hold cancellation
 
-Verified with the real hinge, with the developer slider, and by unit tests.
+Verified with hinge input, with the developer slider, and by unit tests.
 
-**Real hinge.** Level 3 (82° ± 3°, so 79–85°) was played by hand on
-25 September with DeviceHub's internal slider. Four holds were cancelled as the
-hinge drifted out of the window before the fifth held for a full second:
+**Hinge input.** Level 3 (82° ± 3°, so 79–85°) was played by hand on
+25 September, moving the simulated hinge with the internal DeviceHub control.
+Four holds were cancelled as the hinge drifted out of the window before the
+fifth held for a full second:
 
 ```
 11:00:42.481  Hold started at 81.8° from REAL HINGE
@@ -214,20 +237,20 @@ the "closed" sweep jumped from 120.1° straight to 98.3°, over the whole
 
 - Opens with a triple-tap in the top-left corner, or with the launch argument
   `-FoldSafeDeveloperMode YES`.
-- Shows INPUT SOURCE (REAL HINGE in green, SIMULATED in amber), the real hinge's
+- Shows INPUT SOURCE (REAL HINGE in green, SIMULATED in amber), the hinge's
   status and angle, the update count, current angle, target, difference,
   tolerance, state, hold progress and the fold's frame.
 - Moving its slider switches to simulated input and shows a SIMULATED INPUT
-  banner. Closing it returns to the real hinge. After closing it on the final
-  screen and tapping PLAY AGAIN, Level 1 showed FAR AWAY for the real hinge at
-  0°, not the last simulated 84.6°.
+  banner. Closing it returns to hinge input. After closing it on the final
+  screen and tapping PLAY AGAIN, Level 1 showed FAR AWAY for the hinge at 0°,
+  not the last simulated 84.6°.
 - PLAY AGAIN restarts at Level 1 (checked on screen). NEW TARGETS is covered by
-  a unit test that runs 500 seeded draws; it was not tapped on screen this
-  session.
+  a unit test that runs 500 seeded draws; it was not tapped on screen.
 
 ## Hinge behaviour measured in the simulator
 
-From 565 real updates while the internal slider was dragged:
+From 565 updates delivered through `onHingeChange` while the internal DeviceHub
+control was dragged:
 
 - Angles from 0.0° to 180.0°, with 468 distinct values.
 - Steps as small as 0.3°, median 1.1°. That is fine enough for Level 3's ±3°.
@@ -235,7 +258,7 @@ From 565 real updates while the internal slider was dragged:
   gap was 16 ms, the slowest 235 ms).
 - Near the ends the angle snaps: below about 5° it reads 0°, and above about 175°
   it reads 180°.
-- After the slider was released the angle stayed steady; it did not drift.
+- After the control was released the angle stayed steady; it did not drift.
 - The status is not the angle. While closing, the status became `closed` at
   60.4°, the same point where the game moved to the cover screen. While opening,
   it read `closed` at 5.0° and then `partially open` from 108.3°.
@@ -247,7 +270,21 @@ From 565 real updates while the internal slider was dragged:
 ## Physical device
 
 **NOT TESTED.** A physical iPhone Duo is not available until 23 October 2026.
-Everything above comes from the iOS 27.1 simulator.
+
+Tested with Xcode 27.1 beta in the iPhone Duo simulator:
+
+- Apple's public hinge API path (`onHingeChange`)
+- FoldSafe's game logic, including 12 automated tests
+- simulated hinge input from DeviceHub
+- developer-mode simulated input
+
+Not yet verified:
+
+- physical iPhone Duo hardware
+- the real hinge's feel and precision
+- physical sensor behaviour
+- how steadily an arbitrary angle can be held by hand
+- the gameplay experience on a real device
 
 ## Known limitations
 
@@ -266,8 +303,9 @@ Everything above comes from the iOS 27.1 simulator.
 - **Fold region during screen changes.** While the game moves between screens,
   the fold is briefly reported in the other screen's coordinates (for about
   10 ms). The layout corrects itself on the next frame.
-- **Public simulator controls reach only 0°, about 128° and 180°.** Levels 2 and 3
-  need the internal DeviceHub slider, the developer slider, or hardware.
+- **DeviceHub's posture buttons reach only 0°, about 128° and 180°.** Levels 2
+  and 3 need the unsupported internal DeviceHub control, the developer slider,
+  or hardware.
 - **Sound plays even on silent.** The session uses the playback category, mixed
   with other audio, so sounds are heard on camera even if the phone is on silent.
 
