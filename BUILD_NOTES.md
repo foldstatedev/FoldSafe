@@ -1,8 +1,8 @@
 # BUILD_NOTES — FoldSafe
 
 What was built, what was actually proven, and what still needs a physical
-iPhone Duo. Everything below was measured on 24 September 2026. Nothing here
-is inferred from code alone.
+iPhone Duo. Everything below was measured on 24 and 25 September 2026. Nothing
+here is inferred from code alone.
 
 ## At a glance
 
@@ -138,7 +138,7 @@ Nothing in the app depends on this setting.
 | 1 | 128° ± 15° | **REAL** hinge: DeviceHub's public "partially open" button | Unlocked at 127.8° |
 | 1 | 128° ± 15° | **REAL** hinge: internal DeviceHub slider | Unlocked at 116.5° |
 | 2 | 110° ± 7° | **REAL** hinge: internal DeviceHub slider | Unlocked at 115.6° |
-| 3 | 82° ± 3° | **REAL** hinge: internal DeviceHub slider | Unlocked at 79.4° |
+| 3 | 82° ± 3° | **REAL** hinge: internal DeviceHub slider | Unlocked at 79.4°, and again at 80.7° |
 
 The app logs every hold and unlock with its angle and input source, for example
 `Level 2 unlocked at 115.6° from REAL HINGE`.
@@ -176,8 +176,28 @@ proven too. Every unlock was logged as simulated, never as real:
 
 ### Hold cancellation
 
-Verified at runtime and by unit tests. Two runtime cancellations, both with the
-developer slider:
+Verified with the real hinge, with the developer slider, and by unit tests.
+
+**Real hinge.** Level 3 (82° ± 3°, so 79–85°) was played by hand on
+25 September with DeviceHub's internal slider. Four holds were cancelled as the
+hinge drifted out of the window before the fifth held for a full second:
+
+```
+11:00:42.481  Hold started at 81.8° from REAL HINGE
+11:00:42.529  Hold cancelled at 78.5° after 0.05 s
+11:01:12.446  Hold started at 80.1° from REAL HINGE
+11:01:12.895  Hold cancelled at 85.8° after 0.45 s
+11:01:14.072  Hold started at 83.6° from REAL HINGE
+11:01:14.662  Hold cancelled at 85.5° after 0.60 s
+11:01:17.787  Hold started at 83.9° from REAL HINGE
+11:01:18.095  Hold cancelled at 78.2° after 0.32 s
+11:01:19.331  Hold started at 79.8° from REAL HINGE
+11:01:20.349  Level 3 unlocked at 80.7° from REAL HINGE. Game complete
+```
+
+That run also shows Level 3 doing its job: it takes fine adjustment.
+
+**Developer slider.**
 
 ```
 11:47:42.095  Hold started at 115.7° from SIMULATED     Level 2 window is 103–117°
@@ -186,10 +206,9 @@ developer slider:
 11:49:35.560  Hold cancelled at 85.1° after 0.28 s      0.1° outside, no unlock
 ```
 
-A real-hinge cancellation was attempted with DeviceHub's public "closed" button
-during Level 2, but that sweep jumped from 120.1° straight to 98.3°, over the
-whole 103–117° window, so no hold started. Real and simulated input feed the
-same `GameModel.update` call; only `HingeInput.source` differs.
+DeviceHub's public posture buttons cannot show a cancellation: during Level 2
+the "closed" sweep jumped from 120.1° straight to 98.3°, over the whole
+103–117° window, so no hold started.
 
 ### Developer mode and restarting
 
