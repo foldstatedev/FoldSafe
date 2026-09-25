@@ -5,8 +5,8 @@ find a hidden hinge angle, hold it there, and the safe cracks open. There are no
 on-screen controls during play: the hinge is the controller.
 
 Built for Fold State Episode 3. It is a proof of concept, not a product. It
-answers one question: can the physical hinge of iPhone Duo be the primary
-controller for a game?
+explores one question: can the iPhone Duo's hinge be the primary controller
+for a game?
 
 > **Tested in the simulator only.** FoldSafe has been tested in the iPhone Duo
 > simulator. Physical iPhone Duo hardware has not yet been tested.
