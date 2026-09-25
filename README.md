@@ -49,6 +49,10 @@ Levels 2 and 3 need angles the public DeviceHub buttons cannot reach (only
 closed, about 128°, and flat). Use developer mode's slider, or DeviceHub's
 internal hinge slider (see BUILD_NOTES.md), or wait for the hardware.
 
+To run it on a physical iPhone Duo, choose your development team under Signing
+& Capabilities for the FoldSafe target. It has not been tested on hardware yet;
+see BUILD_NOTES.md.
+
 To run the tests:
 
 ```bash
@@ -70,6 +74,13 @@ and where the fold is.
 Its slider drives the game with a simulated angle. That is always labelled
 **SIMULATED INPUT**, and closing developer mode switches back to the real hinge,
 so simulated data can never quietly stand in for the real thing.
+
+## Tech stack
+
+- Swift 6 and SwiftUI, with AVFAudio for the sounds.
+- iOS 27.1, iPhone only.
+- No third-party dependencies, no backend, no network access, and no
+  environment variables or secrets.
 
 ## Requirements
 
